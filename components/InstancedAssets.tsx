@@ -21,12 +21,13 @@ const InstancedAssets: React.FC<InstancedProps> = ({ assets, geometry, color, is
     if (!meshRef.current) return;
 
     const geometry = meshRef.current.geometry;
-    if (!geometry.boundingBox) {
-      geometry.computeBoundingBox();
+    if (!geometry.boundingSphere) {
+      geometry.computeBoundingSphere();
     }
-    const baseBoundingBox = geometry.boundingBox ? geometry.boundingBox.clone() : null;
-    const overallBoundingBox = baseBoundingBox ? new THREE.Box3() : null;
-    const instanceBoundingBox = baseBoundingBox ? new THREE.Box3() : null;
+    const baseBoundingSphere = geometry.boundingSphere ? geometry.boundingSphere.clone() : null;
+    const centersBox = baseBoundingSphere ? new THREE.Box3() : null;
+    const instanceCenters: THREE.Vector3[] = [];
+    const instanceRadii: number[] = [];
 
     assets.forEach((asset, i) => {
       const [x, y, z] = asset.position;
@@ -52,18 +53,54 @@ const InstancedAssets: React.FC<InstancedProps> = ({ assets, geometry, color, is
       tempObject.updateMatrix();
       meshRef.current?.setMatrixAt(i, tempObject.matrix);
 
-      if (baseBoundingBox && overallBoundingBox && instanceBoundingBox) {
-        instanceBoundingBox.copy(baseBoundingBox).applyMatrix4(tempObject.matrix);
-        overallBoundingBox.union(instanceBoundingBox);
+      if (baseBoundingSphere && centersBox) {
+        const instanceCenter = baseBoundingSphere.center.clone().applyMatrix4(tempObject.matrix);
+        const instanceRadius = baseBoundingSphere.radius * Math.max(
+          tempObject.scale.x,
+          tempObject.scale.y,
+          tempObject.scale.z
+        );
+        instanceCenters.push(instanceCenter);
+        instanceRadii.push(instanceRadius);
+        centersBox.expandByPoint(instanceCenter);
       }
     });
 
     meshRef.current.instanceMatrix.needsUpdate = true;
 
-    if (overallBoundingBox) {
-      geometry.boundingBox = overallBoundingBox;
-      geometry.boundingSphere = new THREE.Sphere();
-      overallBoundingBox.getBoundingSphere(geometry.boundingSphere);
+    if (baseBoundingSphere && centersBox) {
+      if (instanceCenters.length === 0) {
+        geometry.boundingSphere = baseBoundingSphere.clone();
+        geometry.boundingBox = new THREE.Box3().setFromCenterAndSize(
+          baseBoundingSphere.center.clone(),
+          new THREE.Vector3(
+            baseBoundingSphere.radius * 2,
+            baseBoundingSphere.radius * 2,
+            baseBoundingSphere.radius * 2
+          )
+        );
+        return;
+      }
+
+      const boundingSphere = new THREE.Sphere();
+      centersBox.getBoundingSphere(boundingSphere);
+
+      let maxRadius = 0;
+      instanceCenters.forEach((center, index) => {
+        const distance = center.distanceTo(boundingSphere.center) + instanceRadii[index];
+        maxRadius = Math.max(maxRadius, distance);
+      });
+
+      boundingSphere.radius = maxRadius;
+      geometry.boundingSphere = boundingSphere;
+
+      const boundingBox = new THREE.Box3();
+      instanceCenters.forEach((center, index) => {
+        const radius = instanceRadii[index];
+        boundingBox.expandByPoint(new THREE.Vector3(center.x - radius, center.y - radius, center.z - radius));
+        boundingBox.expandByPoint(new THREE.Vector3(center.x + radius, center.y + radius, center.z + radius));
+      });
+      geometry.boundingBox = boundingBox;
     }
   }, [assets, isMountain, offsetX, offsetY, offsetZ, tempObject]);
 
