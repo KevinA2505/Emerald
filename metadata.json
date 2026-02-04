@@ -1,0 +1,5 @@
+{
+  "name": "Emerald Forest POV Explorer",
+  "description": "A high-performance 3D first-person explorer featuring procedurally generated forests, rocks, and flora with smooth WASD movement and mouse-look controls.",
+  "requestFramePermissions": []
+}
