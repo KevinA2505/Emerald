@@ -14,6 +14,7 @@ interface InstancedProps {
   enableViewCulling?: boolean;
   maxDistance?: number;
   fovPadding?: number;
+  onMeshReady?: (mesh: THREE.InstancedMesh) => void;
 }
 
 const InstancedAssets: React.FC<InstancedProps> = ({
@@ -24,13 +25,14 @@ const InstancedAssets: React.FC<InstancedProps> = ({
   positionOffset,
   enableViewCulling = false,
   maxDistance = Infinity,
-  fovPadding = 12
+  fovPadding = 12,
+  onMeshReady
 }) => {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const tempObject = useMemo(() => new THREE.Object3D(), []);
   const { camera } = useThree();
   const [offsetX, offsetY, offsetZ] = positionOffset ?? [0, 0, 0];
-  const instanceTransformsRef = useRef<{ matrix: THREE.Matrix4; position: THREE.Vector3 }[]>([]);
+  const instanceTransformsRef = useRef<{ matrix: THREE.Matrix4; position: THREE.Vector3; assetId: number }[]>([]);
   const cameraDirection = useMemo(() => new THREE.Vector3(), []);
   const toInstance = useMemo(() => new THREE.Vector3(), []);
   const cameraPosition = useMemo(() => new THREE.Vector3(), []);
@@ -86,11 +88,17 @@ const InstancedAssets: React.FC<InstancedProps> = ({
         centersBox.expandByPoint(instanceCenter);
       }
 
-      return { matrix: instanceMatrix, position: instancePosition };
+      return { matrix: instanceMatrix, position: instancePosition, assetId: asset.id };
     });
 
     meshRef.current.instanceMatrix.needsUpdate = true;
     meshRef.current.count = assets.length;
+    meshRef.current.userData.assetIds = assets.map((asset) => asset.id);
+    meshRef.current.userData.assetKind = assets[0]?.type ?? null;
+    meshRef.current.userData.assetInstanceType = type;
+    if (onMeshReady) {
+      onMeshReady(meshRef.current);
+    }
 
     if (baseBoundingSphere && centersBox) {
       if (instanceCenters.length === 0) {
@@ -126,7 +134,7 @@ const InstancedAssets: React.FC<InstancedProps> = ({
       });
       geometry.boundingBox = boundingBox;
     }
-  }, [assets, isMountain, offsetX, offsetY, offsetZ, tempObject]);
+  }, [assets, isMountain, offsetX, offsetY, offsetZ, tempObject, type, onMeshReady]);
 
   useFrame(() => {
     if (!meshRef.current || !enableViewCulling) return;
@@ -140,6 +148,7 @@ const InstancedAssets: React.FC<InstancedProps> = ({
     const cosThreshold = Math.cos(fovRadians);
 
     let visibleIndex = 0;
+    const visibleAssetIds: number[] = [];
     instanceTransformsRef.current.forEach((instance) => {
       const distance = instance.position.distanceTo(cameraPosition);
       if (distance > maxDistance) return;
@@ -148,12 +157,14 @@ const InstancedAssets: React.FC<InstancedProps> = ({
       if (toInstance.dot(cameraDirection) < cosThreshold) return;
 
       meshRef.current?.setMatrixAt(visibleIndex, instance.matrix);
+      visibleAssetIds.push(instance.assetId);
       visibleIndex += 1;
     });
 
     if (meshRef.current.count !== visibleIndex) {
       meshRef.current.count = visibleIndex;
     }
+    meshRef.current.userData.assetIds = visibleAssetIds;
     meshRef.current.instanceMatrix.needsUpdate = true;
   });
 

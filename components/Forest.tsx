@@ -1,5 +1,6 @@
 
 import React, { useMemo } from 'react';
+import type { InstancedMesh } from 'three';
 import InstancedAssets from './InstancedAssets';
 import Tree from './Tree';
 import Rock from './Rock';
@@ -15,9 +16,18 @@ interface ForestProps {
   treeStates: Record<number, TreeState>;
   rockStates: Record<number, RockState>;
   plantStates: Record<number, PlantState>;
+  onTreeInstancedMesh?: (key: string, mesh: InstancedMesh) => void;
 }
 
-const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, rockStates, plantStates }) => {
+const Forest: React.FC<ForestProps> = ({
+  assets,
+  ponds,
+  mountains,
+  treeStates,
+  rockStates,
+  plantStates,
+  onTreeInstancedMesh
+}) => {
   const { instancedTrees, animatedTrees, instancedRocks, animatedRocks, instancedPlants, animatedPlants } = useMemo(() => {
     const instancedTreeAssets: ForestAsset[] = [];
     const animatedTreeAssets: ForestAsset[] = [];
@@ -96,6 +106,7 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             enableViewCulling
             maxDistance={MAP_LIMIT + 20}
             fovPadding={15}
+            onMeshReady={(mesh) => onTreeInstancedMesh?.('pine-trunk', mesh)}
           />
           <InstancedAssets
             assets={pineTrees}
@@ -106,6 +117,7 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             enableViewCulling
             maxDistance={MAP_LIMIT + 20}
             fovPadding={15}
+            onMeshReady={(mesh) => onTreeInstancedMesh?.('pine-foliage', mesh)}
           />
         </>
       )}
@@ -121,6 +133,7 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             enableViewCulling
             maxDistance={MAP_LIMIT + 20}
             fovPadding={15}
+            onMeshReady={(mesh) => onTreeInstancedMesh?.('oak-trunk', mesh)}
           />
           <InstancedAssets
             assets={oakTrees}
@@ -131,6 +144,7 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             enableViewCulling
             maxDistance={MAP_LIMIT + 20}
             fovPadding={15}
+            onMeshReady={(mesh) => onTreeInstancedMesh?.('oak-foliage', mesh)}
           />
         </>
       )}
@@ -146,6 +160,7 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             enableViewCulling
             maxDistance={MAP_LIMIT + 20}
             fovPadding={15}
+            onMeshReady={(mesh) => onTreeInstancedMesh?.('birch-trunk', mesh)}
           />
           <InstancedAssets
             assets={birchTrees}
@@ -156,6 +171,7 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             enableViewCulling
             maxDistance={MAP_LIMIT + 20}
             fovPadding={15}
+            onMeshReady={(mesh) => onTreeInstancedMesh?.('birch-foliage', mesh)}
           />
         </>
       )}

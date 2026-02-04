@@ -22,6 +22,7 @@ interface WeaponPOVProps {
   onTreeHit?: (id: number) => void;
   onRockHit?: (id: number) => void;
   onPlantHit?: (id: number) => void;
+  treeInstancedMeshesRef?: React.MutableRefObject<Map<string, THREE.InstancedMesh>>;
 }
 
 const AxeModel: React.FC<{ isAttacking: boolean }> = ({ isAttacking }) => {
@@ -72,7 +73,18 @@ const KnifeModel: React.FC<{ isAttacking: boolean; isCharging: boolean }> = ({ i
   );
 };
 
-const WeaponPOV: React.FC<WeaponPOVProps> = ({ weapon, isLocked, mode, assets, onThrow, onCharge, onTreeHit, onRockHit, onPlantHit }) => {
+const WeaponPOV: React.FC<WeaponPOVProps> = ({
+  weapon,
+  isLocked,
+  mode,
+  assets,
+  onThrow,
+  onCharge,
+  onTreeHit,
+  onRockHit,
+  onPlantHit,
+  treeInstancedMeshesRef
+}) => {
   const { camera, scene } = useThree();
   const groupRef = useRef<THREE.Group>(null);
   const animGroupRef = useRef<THREE.Group>(null);
@@ -122,7 +134,7 @@ const WeaponPOV: React.FC<WeaponPOVProps> = ({ weapon, isLocked, mode, assets, o
     const meshMap = new Map<number, THREE.Object3D[]>();
     scene.traverse((object) => {
       if (!object.name) return;
-      const match = object.name.match(/^(tree|rock|plant)-(\d+)/);
+      const match = object.name.match(/^(tree|rock|plant)(?:-[a-z]+)?-(\d+)/);
       if (!match) return;
       const id = parseInt(match[2], 10);
       const bucket = meshMap.get(id);
@@ -140,21 +152,40 @@ const WeaponPOV: React.FC<WeaponPOVProps> = ({ weapon, isLocked, mode, assets, o
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
     raycaster.current.set(camera.position, dir);
+    let hitAssetId: number | null = null;
+    let hitType: 'tree' | 'rock' | 'plant' | null = null;
+    const instancedMeshes = treeInstancedMeshesRef
+      ? Array.from(treeInstancedMeshesRef.current.values())
+      : [];
+    const instancedIntersects = instancedMeshes.length > 0
+      ? raycaster.current.intersectObjects(instancedMeshes, false)
+      : [];
+    const instancedHit = instancedIntersects.find((intersection) => (
+      intersection.distance < ACTION_RANGE && intersection.instanceId !== undefined && intersection.instanceId !== null
+    ));
+    if (instancedHit) {
+      const instanceId = instancedHit.instanceId ?? null;
+      if (instanceId !== null) {
+        const assetIds = (instancedHit.object as THREE.InstancedMesh).userData?.assetIds as number[] | undefined;
+        const assetId = assetIds?.[instanceId];
+        if (assetId !== undefined) {
+          hitAssetId = assetId;
+          hitType = 'tree';
+        }
+      }
+    }
     const candidates = assetGrid.query(camera.position.x, camera.position.z, ACTION_RANGE);
     const candidateMeshes: THREE.Object3D[] = [];
     candidates.forEach((asset) => {
       const meshes = interactiveMeshes.current.get(asset.id);
       if (meshes) candidateMeshes.push(...meshes);
     });
-    const intersects = candidateMeshes.length > 0
+    const intersects = hitAssetId === null && candidateMeshes.length > 0
       ? raycaster.current.intersectObjects(candidateMeshes, true)
       : [];
-    let hitObject = intersects.find(i => i.distance < ACTION_RANGE && !i.object.name.includes('weapon'));
-    
-    let hitAssetId: number | null = null;
-    let hitType: 'tree' | 'rock' | 'plant' | null = null;
+    const hitObject = intersects.find(i => i.distance < ACTION_RANGE && !i.object.name.includes('weapon'));
 
-    if (hitObject) {
+    if (hitObject && hitAssetId === null) {
       const name = hitObject.object.name;
       if (name.startsWith('tree-')) { const idMatch = name.match(/\d+/); if (idMatch) { hitAssetId = parseInt(idMatch[0]); hitType = 'tree'; } }
       else if (name.startsWith('rock-')) { const idMatch = name.match(/\d+/); if (idMatch) { hitAssetId = parseInt(idMatch[0]); hitType = 'rock'; } }

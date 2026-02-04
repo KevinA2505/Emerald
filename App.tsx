@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { PointerLockControls, Sky, Stars } from '@react-three/drei';
+import type { InstancedMesh } from 'three';
 import Forest from './components/Forest';
 import Player from './components/Player';
 import UIOverlay from './components/UIOverlay';
@@ -51,8 +52,13 @@ const App: React.FC = () => {
   const rockStatesRef = useRef<Record<number, RockState>>({});
   const activeTreeIdsRef = useRef<Set<number>>(new Set());
   const activeRockIdsRef = useRef<Set<number>>(new Set());
+  const treeInstancedMeshesRef = useRef<Map<string, InstancedMesh>>(new Map());
 
   const worldData = useWorldData(MAP_LIMIT);
+
+  const handleTreeInstancedMesh = useCallback((key: string, mesh: InstancedMesh) => {
+    treeInstancedMeshesRef.current.set(key, mesh);
+  }, []);
 
   useEffect(() => {
     setTreeStates(worldData.initialTreeStates);
@@ -303,6 +309,7 @@ const App: React.FC = () => {
           treeStates={treeStates}
           rockStates={rockStates}
           plantStates={plantStates}
+          onTreeInstancedMesh={handleTreeInstancedMesh}
         />
         
         <Player 
@@ -328,6 +335,7 @@ const App: React.FC = () => {
             onTreeHit={handleTreeHit}
             onRockHit={handleRockHit}
             onPlantHit={handlePlantHit}
+            treeInstancedMeshesRef={treeInstancedMeshesRef}
           />
         )}
 
