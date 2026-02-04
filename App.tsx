@@ -240,6 +240,28 @@ const App: React.FC = () => {
     rockStatesRef.current = rockStates;
   }, [rockStates]);
 
+  const obstacles = useMemo(
+    () =>
+      worldData.assets.filter(a => {
+        if (a.type === 'tree') return !treeStates[a.id]?.isRemoved;
+        if (a.type === 'rock') return !rockStates[a.id]?.isRemoved;
+        if (a.type === 'plant') return !plantStates[a.id]?.isRemoved;
+        return true;
+      }),
+    [worldData.assets, treeStates, rockStates, plantStates]
+  );
+
+  const collidableAssets = useMemo(
+    () =>
+      worldData.assets.filter(a => {
+        if (a.type === 'tree') return !treeStates[a.id]?.isRemoved;
+        if (a.type === 'rock') return !rockStates[a.id]?.isRemoved;
+        if (a.type === 'plant') return !plantStates[a.id]?.isRemoved;
+        return true;
+      }),
+    [worldData.assets, treeStates, rockStates, plantStates]
+  );
+
   const addResource = useCallback((type: keyof Resources, amount: number) => {
     setResources(prev => ({ ...prev, [type]: prev[type] + amount }));
   }, []);
@@ -504,12 +526,7 @@ const App: React.FC = () => {
         />
         
         <Player 
-          obstacles={worldData.assets.filter(a => {
-            if (a.type === 'tree') return !treeStates[a.id]?.isRemoved;
-            if (a.type === 'rock') return !rockStates[a.id]?.isRemoved;
-            if (a.type === 'plant') return !plantStates[a.id]?.isRemoved;
-            return true;
-          })} 
+          obstacles={obstacles} 
           ponds={worldData.ponds} 
           mountains={worldData.mountains} 
           blockInput={isInventoryOpen || !hasStarted}
@@ -518,12 +535,7 @@ const App: React.FC = () => {
           onLookInteractable={setIsLookingAtInteractable}
         />
         
-        <ThrownKnivesManager knives={thrownKnives} assets={worldData.assets.filter(a => {
-            if (a.type === 'tree') return !treeStates[a.id]?.isRemoved;
-            if (a.type === 'rock') return !rockStates[a.id]?.isRemoved;
-            if (a.type === 'plant') return !plantStates[a.id]?.isRemoved;
-            return true;
-          })} />
+        <ThrownKnivesManager knives={thrownKnives} assets={collidableAssets} />
 
         {equippedWeapon && (
           <WeaponPOV 
