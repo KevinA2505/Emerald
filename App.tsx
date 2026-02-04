@@ -95,11 +95,13 @@ const App: React.FC = () => {
       const current = prev[treeId];
       const result = resolveTreeHit({ treeState: current, weapon: equippedWeapon });
       if (!result) return prev;
+      const nextTreeStates = { ...prev, [treeId]: result.nextState };
+      treeStatesRef.current = nextTreeStates;
       Object.entries(result.resourceChanges).forEach(([type, amount]) => {
         addResource(type as keyof Resources, amount as number);
       });
       if (result.activateTree) activeTreeIdsRef.current.add(treeId);
-      return { ...prev, [treeId]: result.nextState };
+      return nextTreeStates;
     });
   }, [equippedWeapon, addResource]);
 
