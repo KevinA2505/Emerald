@@ -20,6 +20,14 @@ const InstancedAssets: React.FC<InstancedProps> = ({ assets, geometry, color, is
   useEffect(() => {
     if (!meshRef.current) return;
 
+    const geometry = meshRef.current.geometry;
+    if (!geometry.boundingBox) {
+      geometry.computeBoundingBox();
+    }
+    const baseBoundingBox = geometry.boundingBox ? geometry.boundingBox.clone() : null;
+    const overallBoundingBox = baseBoundingBox ? new THREE.Box3() : null;
+    const instanceBoundingBox = baseBoundingBox ? new THREE.Box3() : null;
+
     assets.forEach((asset, i) => {
       const [x, y, z] = asset.position;
       
@@ -43,9 +51,20 @@ const InstancedAssets: React.FC<InstancedProps> = ({ assets, geometry, color, is
       tempObject.rotation.y = asset.rotation;
       tempObject.updateMatrix();
       meshRef.current?.setMatrixAt(i, tempObject.matrix);
+
+      if (baseBoundingBox && overallBoundingBox && instanceBoundingBox) {
+        instanceBoundingBox.copy(baseBoundingBox).applyMatrix4(tempObject.matrix);
+        overallBoundingBox.union(instanceBoundingBox);
+      }
     });
 
     meshRef.current.instanceMatrix.needsUpdate = true;
+
+    if (overallBoundingBox) {
+      geometry.boundingBox = overallBoundingBox;
+      geometry.boundingSphere = new THREE.Sphere();
+      overallBoundingBox.getBoundingSphere(geometry.boundingSphere);
+    }
   }, [assets, isMountain, offsetX, offsetY, offsetZ, tempObject]);
 
   return (
