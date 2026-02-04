@@ -95,6 +95,7 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             positionOffset={[0, 0.75, 0]}
             enableViewCulling
             maxDistance={MAP_LIMIT + 20}
+            fovPadding={15}
           />
           <InstancedAssets
             assets={pineTrees}
@@ -104,6 +105,7 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             positionOffset={[0, 1.8, 0]}
             enableViewCulling
             maxDistance={MAP_LIMIT + 20}
+            fovPadding={15}
           />
         </>
       )}
@@ -118,6 +120,7 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             positionOffset={[0, 1, 0]}
             enableViewCulling
             maxDistance={MAP_LIMIT + 20}
+            fovPadding={15}
           />
           <InstancedAssets
             assets={oakTrees}
@@ -127,6 +130,7 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             positionOffset={[0, 2.8, 0]}
             enableViewCulling
             maxDistance={MAP_LIMIT + 20}
+            fovPadding={15}
           />
         </>
       )}
@@ -141,6 +145,7 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             positionOffset={[0, 2.5, 0]}
             enableViewCulling
             maxDistance={MAP_LIMIT + 20}
+            fovPadding={15}
           />
           <InstancedAssets
             assets={birchTrees}
@@ -150,6 +155,7 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             positionOffset={[0, 5, 0]}
             enableViewCulling
             maxDistance={MAP_LIMIT + 20}
+            fovPadding={15}
           />
         </>
       )}
@@ -162,6 +168,7 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
           type="rock"
           enableViewCulling
           maxDistance={MAP_LIMIT + 20}
+          fovPadding={15}
         />
       )}
 
@@ -173,6 +180,7 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
           type="plant"
           enableViewCulling
           maxDistance={MAP_LIMIT + 20}
+          fovPadding={15}
         />
       )}
 
@@ -203,6 +211,7 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
           isMountain
           enableViewCulling
           maxDistance={MAP_LIMIT + 40}
+          fovPadding={15}
         />
       )}
     </group>

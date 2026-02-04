@@ -24,7 +24,7 @@ const InstancedAssets: React.FC<InstancedProps> = ({
   positionOffset,
   enableViewCulling = false,
   maxDistance = Infinity,
-  fovPadding = 5
+  fovPadding = 12
 }) => {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const tempObject = useMemo(() => new THREE.Object3D(), []);
