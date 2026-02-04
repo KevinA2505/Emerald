@@ -1,8 +1,9 @@
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Vector3, Raycaster } from 'three';
+import { Vector3, Raycaster, Object3D } from 'three';
 import { ForestAsset, PondData, isPointInPolygon, MAP_LIMIT, PlantState } from '../App';
+import { SpatialGrid } from './SpatialGrid';
 
 const BASE_WALK_SPEED = 0.11;
 const BASE_SPRINT_SPEED = 0.22;
@@ -14,6 +15,7 @@ const STEP_HEIGHT_LIMIT = 0.6;
 const WATER_SPEED_PENALTY = 0.45;
 const SUBMERSION_DEPTH = EYE_HEIGHT * 0.15;
 const INTERACTION_RANGE = 3.0;
+const INTERACTION_CELL_SIZE = 8;
 
 interface PlayerProps {
   obstacles: ForestAsset[];
@@ -42,6 +44,11 @@ const Player: React.FC<PlayerProps> = ({
   const isInWater = useRef(false);
   const raycaster = useRef(new Raycaster());
   const [lookingAtPlantId, setLookingAtPlantId] = useState<number | null>(null);
+  const interactiveMeshes = useRef<Map<number, Object3D[]>>(new Map());
+
+  const obstacleGrid = useMemo(() => {
+    return new SpatialGrid(obstacles, INTERACTION_CELL_SIZE);
+  }, [obstacles]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => { 
@@ -60,9 +67,40 @@ const Player: React.FC<PlayerProps> = ({
     };
   }, [blockInput, plantStates]);
 
+  useEffect(() => {
+    const meshMap = new Map<number, Object3D[]>();
+    scene.traverse((object) => {
+      if (!object.name) return;
+      const match = object.name.match(/^(tree|rock|plant)-(\d+)/);
+      if (!match) return;
+      const id = parseInt(match[2], 10);
+      const bucket = meshMap.get(id);
+      if (bucket) {
+        bucket.push(object);
+      } else {
+        meshMap.set(id, [object]);
+      }
+    });
+    interactiveMeshes.current = meshMap;
+  }, [scene, obstacles]);
+
   const checkInteraction = (performAction: boolean) => {
+    const candidates = obstacleGrid
+      .query(camera.position.x, camera.position.z, INTERACTION_RANGE)
+      .filter((asset) => asset.type === 'plant');
+    const candidateMeshes: Object3D[] = [];
+    candidates.forEach((asset) => {
+      const meshes = interactiveMeshes.current.get(asset.id);
+      if (meshes) candidateMeshes.push(...meshes);
+    });
+    if (candidateMeshes.length === 0) {
+      setLookingAtPlantId(null);
+      onLookInteractable(false);
+      return;
+    }
+
     raycaster.current.setFromCamera({ x: 0, y: 0 }, camera);
-    const intersects = raycaster.current.intersectObjects(scene.children, true);
+    const intersects = raycaster.current.intersectObjects(candidateMeshes, true);
     
     // Filtrar objetos dentro de rango que sean arbustos con frutos
     const hit = intersects.find(i => {

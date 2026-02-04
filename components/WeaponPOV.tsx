@@ -3,12 +3,14 @@ import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Item, AttackMode, ThrownKnifeData, ForestAsset } from '../App';
+import { SpatialGrid } from './SpatialGrid';
 
 const CHARGE_SPEED = 2.2; 
 const HEAVY_TOOL_CYCLE = 0.55; 
 const HIT_STOP_DURATION = 0.04; 
 const ACTION_RANGE = 3.5; 
 const FUZZY_TOLERANCE = 0.45; 
+const ACTION_CELL_SIZE = 10;
 
 interface WeaponPOVProps {
   weapon: Item;
@@ -76,6 +78,7 @@ const WeaponPOV: React.FC<WeaponPOVProps> = ({ weapon, isLocked, mode, assets, o
   const animGroupRef = useRef<THREE.Group>(null);
   const trailRef = useRef<THREE.Mesh>(null);
   const raycaster = useRef(new THREE.Raycaster());
+  const interactiveMeshes = useRef<Map<number, THREE.Object3D[]>>(new Map());
   
   const [isAttacking, setIsAttacking] = useState(false);
   const [isCharging, setIsCharging] = useState(false);
@@ -90,6 +93,10 @@ const WeaponPOV: React.FC<WeaponPOVProps> = ({ weapon, isLocked, mode, assets, o
   const isAxe = weapon.id === 'axe_01';
   const isPickaxe = weapon.id === 'pickaxe_01';
   const isHeavyTool = isAxe || isPickaxe;
+
+  const assetGrid = useMemo(() => {
+    return new SpatialGrid(assets.filter((asset) => asset.type !== 'mountain'), ACTION_CELL_SIZE);
+  }, [assets]);
 
   useEffect(() => {
     const handleMouseDown = (e: MouseEvent) => {
@@ -111,12 +118,37 @@ const WeaponPOV: React.FC<WeaponPOVProps> = ({ weapon, isLocked, mode, assets, o
     return () => { window.removeEventListener('mousedown', handleMouseDown); window.removeEventListener('mouseup', handleMouseUp); };
   }, [isLocked, isAttacking, mode, isCharging, onThrow, onCharge, camera]);
 
+  useEffect(() => {
+    const meshMap = new Map<number, THREE.Object3D[]>();
+    scene.traverse((object) => {
+      if (!object.name) return;
+      const match = object.name.match(/^(tree|rock|plant)-(\d+)/);
+      if (!match) return;
+      const id = parseInt(match[2], 10);
+      const bucket = meshMap.get(id);
+      if (bucket) {
+        bucket.push(object);
+      } else {
+        meshMap.set(id, [object]);
+      }
+    });
+    interactiveMeshes.current = meshMap;
+  }, [scene, assets]);
+
   const performHitDetection = () => {
     if (hasHit.current) return;
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
     raycaster.current.set(camera.position, dir);
-    const intersects = raycaster.current.intersectObjects(scene.children, true);
+    const candidates = assetGrid.query(camera.position.x, camera.position.z, ACTION_RANGE);
+    const candidateMeshes: THREE.Object3D[] = [];
+    candidates.forEach((asset) => {
+      const meshes = interactiveMeshes.current.get(asset.id);
+      if (meshes) candidateMeshes.push(...meshes);
+    });
+    const intersects = candidateMeshes.length > 0
+      ? raycaster.current.intersectObjects(candidateMeshes, true)
+      : [];
     let hitObject = intersects.find(i => i.distance < ACTION_RANGE && !i.object.name.includes('weapon'));
     
     let hitAssetId: number | null = null;
@@ -131,8 +163,7 @@ const WeaponPOV: React.FC<WeaponPOVProps> = ({ weapon, isLocked, mode, assets, o
 
     if (!hitAssetId) {
       let closestDistToRay = Infinity;
-      assets.forEach(asset => {
-        if (asset.type === 'mountain') return;
+      candidates.forEach(asset => {
         const playerToAsset = new THREE.Vector3(...asset.position).sub(camera.position);
         if (playerToAsset.length() < ACTION_RANGE) {
           const projection = playerToAsset.dot(dir);
