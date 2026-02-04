@@ -9,11 +9,13 @@ interface InstancedProps {
   color: string;
   type: string;
   isMountain?: boolean;
+  positionOffset?: [number, number, number];
 }
 
-const InstancedAssets: React.FC<InstancedProps> = ({ assets, geometry, color, isMountain }) => {
+const InstancedAssets: React.FC<InstancedProps> = ({ assets, geometry, color, isMountain, positionOffset }) => {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const tempObject = useMemo(() => new THREE.Object3D(), []);
+  const [offsetX, offsetY, offsetZ] = positionOffset ?? [0, 0, 0];
 
   useEffect(() => {
     if (!meshRef.current) return;
@@ -23,10 +25,18 @@ const InstancedAssets: React.FC<InstancedProps> = ({ assets, geometry, color, is
       
       if (isMountain) {
         // Las montañas tienen un ajuste especial de altura para que el cono nazca del suelo
-        tempObject.position.set(x, asset.height / 2 - 1, z);
+        tempObject.position.set(
+          x + offsetX * asset.scale,
+          asset.height / 2 - 1 + offsetY * asset.scale,
+          z + offsetZ * asset.scale
+        );
         tempObject.scale.set(asset.scale, asset.height, asset.scale);
       } else {
-        tempObject.position.set(x, y, z);
+        tempObject.position.set(
+          x + offsetX * asset.scale,
+          y + offsetY * asset.scale,
+          z + offsetZ * asset.scale
+        );
         tempObject.scale.set(asset.scale, asset.scale, asset.scale);
       }
       
@@ -36,7 +46,7 @@ const InstancedAssets: React.FC<InstancedProps> = ({ assets, geometry, color, is
     });
 
     meshRef.current.instanceMatrix.needsUpdate = true;
-  }, [assets, isMountain, tempObject]);
+  }, [assets, isMountain, offsetX, offsetY, offsetZ, tempObject]);
 
   return (
     <instancedMesh ref={meshRef} args={[null as any, null as any, assets.length]} castShadow receiveShadow>
