@@ -2,7 +2,9 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Vector3, Raycaster, Object3D } from 'three';
-import { ForestAsset, PondData, isPointInPolygon, MAP_LIMIT, PlantState } from '../App';
+import { MAP_LIMIT } from '../constants';
+import { isPointInPolygon } from '../utils/geometry';
+import { ForestAsset, PondData, PlantState } from '../types';
 import { SpatialGrid } from './SpatialGrid';
 
 const BASE_WALK_SPEED = 0.11;

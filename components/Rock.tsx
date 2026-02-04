@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { ForestAsset, RockState } from '../App';
+import { ForestAsset, RockState } from '../types';
 import * as THREE from 'three';
 
 interface RockProps {

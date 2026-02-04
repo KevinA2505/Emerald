@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
-import { PondData } from '../App';
+import { PondData } from '../types';
 
 interface PondProps {
   data: PondData;

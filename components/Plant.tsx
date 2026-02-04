@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { ForestAsset, PlantState } from '../App';
+import { ForestAsset, PlantState } from '../types';
 
 interface PlantProps {
   data: ForestAsset;
