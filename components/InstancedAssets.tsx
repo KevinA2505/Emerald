@@ -1,6 +1,7 @@
 
 import React, { useMemo, useRef, useEffect } from 'react';
 import * as THREE from 'three';
+import { useFrame, useThree } from '@react-three/fiber';
 import { ForestAsset } from '../types';
 
 interface InstancedProps {
@@ -10,12 +11,29 @@ interface InstancedProps {
   type: string;
   isMountain?: boolean;
   positionOffset?: [number, number, number];
+  enableViewCulling?: boolean;
+  maxDistance?: number;
+  fovPadding?: number;
 }
 
-const InstancedAssets: React.FC<InstancedProps> = ({ assets, geometry, color, isMountain, positionOffset }) => {
+const InstancedAssets: React.FC<InstancedProps> = ({
+  assets,
+  geometry,
+  color,
+  isMountain,
+  positionOffset,
+  enableViewCulling = false,
+  maxDistance = Infinity,
+  fovPadding = 5
+}) => {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const tempObject = useMemo(() => new THREE.Object3D(), []);
+  const { camera } = useThree();
   const [offsetX, offsetY, offsetZ] = positionOffset ?? [0, 0, 0];
+  const instanceTransformsRef = useRef<{ matrix: THREE.Matrix4; position: THREE.Vector3 }[]>([]);
+  const cameraDirection = useMemo(() => new THREE.Vector3(), []);
+  const toInstance = useMemo(() => new THREE.Vector3(), []);
+  const cameraPosition = useMemo(() => new THREE.Vector3(), []);
 
   useEffect(() => {
     if (!meshRef.current) return;
@@ -29,7 +47,7 @@ const InstancedAssets: React.FC<InstancedProps> = ({ assets, geometry, color, is
     const instanceCenters: THREE.Vector3[] = [];
     const instanceRadii: number[] = [];
 
-    assets.forEach((asset, i) => {
+    instanceTransformsRef.current = assets.map((asset, i) => {
       const [x, y, z] = asset.position;
       
       if (isMountain) {
@@ -53,6 +71,9 @@ const InstancedAssets: React.FC<InstancedProps> = ({ assets, geometry, color, is
       tempObject.updateMatrix();
       meshRef.current?.setMatrixAt(i, tempObject.matrix);
 
+      const instancePosition = new THREE.Vector3().setFromMatrixPosition(tempObject.matrix);
+      const instanceMatrix = tempObject.matrix.clone();
+
       if (baseBoundingSphere && centersBox) {
         const instanceCenter = baseBoundingSphere.center.clone().applyMatrix4(tempObject.matrix);
         const instanceRadius = baseBoundingSphere.radius * Math.max(
@@ -64,9 +85,12 @@ const InstancedAssets: React.FC<InstancedProps> = ({ assets, geometry, color, is
         instanceRadii.push(instanceRadius);
         centersBox.expandByPoint(instanceCenter);
       }
+
+      return { matrix: instanceMatrix, position: instancePosition };
     });
 
     meshRef.current.instanceMatrix.needsUpdate = true;
+    meshRef.current.count = assets.length;
 
     if (baseBoundingSphere && centersBox) {
       if (instanceCenters.length === 0) {
@@ -104,8 +128,43 @@ const InstancedAssets: React.FC<InstancedProps> = ({ assets, geometry, color, is
     }
   }, [assets, isMountain, offsetX, offsetY, offsetZ, tempObject]);
 
+  useFrame(() => {
+    if (!meshRef.current || !enableViewCulling) return;
+
+    camera.getWorldDirection(cameraDirection);
+    cameraPosition.copy(camera.position);
+
+    const fovRadians = camera instanceof THREE.PerspectiveCamera
+      ? THREE.MathUtils.degToRad(camera.fov / 2 + fovPadding)
+      : Math.PI;
+    const cosThreshold = Math.cos(fovRadians);
+
+    let visibleIndex = 0;
+    instanceTransformsRef.current.forEach((instance) => {
+      const distance = instance.position.distanceTo(cameraPosition);
+      if (distance > maxDistance) return;
+
+      toInstance.subVectors(instance.position, cameraPosition).normalize();
+      if (toInstance.dot(cameraDirection) < cosThreshold) return;
+
+      meshRef.current?.setMatrixAt(visibleIndex, instance.matrix);
+      visibleIndex += 1;
+    });
+
+    if (meshRef.current.count !== visibleIndex) {
+      meshRef.current.count = visibleIndex;
+    }
+    meshRef.current.instanceMatrix.needsUpdate = true;
+  });
+
   return (
-    <instancedMesh ref={meshRef} args={[null as any, null as any, assets.length]} castShadow receiveShadow>
+    <instancedMesh
+      ref={meshRef}
+      args={[null as any, null as any, assets.length]}
+      castShadow
+      receiveShadow
+      frustumCulled={!enableViewCulling}
+    >
       {geometry}
       <meshStandardMaterial color={color} roughness={isMountain ? 1 : 0.9} />
     </instancedMesh>
