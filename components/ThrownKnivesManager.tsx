@@ -2,7 +2,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { ThrownKnifeData, ForestAsset, MAP_LIMIT } from '../App';
+import { MAP_LIMIT } from '../constants';
+import { ThrownKnifeData, ForestAsset } from '../types';
 
 interface ThrownKnivesManagerProps {
   knives: ThrownKnifeData[];

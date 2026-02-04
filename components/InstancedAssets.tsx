@@ -1,7 +1,7 @@
 
 import React, { useMemo, useRef, useEffect } from 'react';
 import * as THREE from 'three';
-import { ForestAsset } from '../App';
+import { ForestAsset } from '../types';
 
 interface InstancedProps {
   assets: ForestAsset[];

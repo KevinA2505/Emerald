@@ -2,7 +2,7 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Item, AttackMode, ThrownKnifeData, ForestAsset } from '../App';
+import { Item, AttackMode, ThrownKnifeData, ForestAsset } from '../types';
 import { SpatialGrid } from './SpatialGrid';
 
 const CHARGE_SPEED = 2.2; 

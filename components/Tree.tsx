@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { ForestAsset, TreeState } from '../App';
+import { ForestAsset, TreeState } from '../types';
 import * as THREE from 'three';
 
 interface TreeProps {

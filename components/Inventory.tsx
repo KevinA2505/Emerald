@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Item, Resources } from '../App';
+import { Item, Resources } from '../types';
 
 interface InventoryProps {
   onClose: () => void;

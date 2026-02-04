@@ -8,92 +8,24 @@ import UIOverlay from './components/UIOverlay';
 import Inventory from './components/Inventory';
 import WeaponPOV from './components/WeaponPOV';
 import ThrownKnivesManager from './components/ThrownKnivesManager';
-
-export const MAP_LIMIT = 145; 
-
-export type AttackMode = 'slash' | 'throw';
-export type FruitType = 'red' | 'blue' | 'yellow';
-
-export interface ThrownKnifeData {
-  id: string;
-  position: [number, number, number];
-  direction: [number, number, number];
-  rotation: [number, number, number];
-  power: number; 
-}
-
-export interface Item {
-  id: string;
-  name: string;
-  type: 'weapon' | 'gadget' | 'resource';
-  damage?: number;
-  count?: number;
-  isConsumable?: boolean;
-  fruitType?: FruitType;
-}
-
-export interface Resources {
-  wood: number;
-  fiber: number;
-  sticks: number;
-  stones: number;
-  seeds: number;
-}
-
-export interface ForestAsset {
-  id: number;
-  type: 'tree' | 'rock' | 'plant' | 'mountain';
-  subType?: 'pine' | 'oak' | 'birch' | 'small' | 'large';
-  position: [number, number, number];
-  scale: number;
-  rotation: number;
-  radius: number;
-  height: number;
-}
-
-export interface TreeState {
-  health: number;
-  maxHealth: number;
-  isFalling: boolean;
-  fallProgress: number; 
-  fallDirection: [number, number]; 
-  opacity: number; 
-  isRemoved: boolean;
-}
-
-export interface RockState {
-  health: number;
-  maxHealth: number;
-  isRemoved: boolean;
-  shakeTime: number;
-  cracks: number;
-}
-
-export interface PlantState {
-  hasFruit: boolean;
-  fruitType?: FruitType;
-  fruitCount: number;
-  health: number;
-  isRemoved: boolean;
-}
-
-export interface PondData {
-  id: number;
-  position: [number, number, number];
-  vertices: [number, number][];
-}
-
-export const isPointInPolygon = (px: number, py: number, polygon: [number, number][]) => {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i][0], yi = polygon[i][1];
-    const xj = polygon[j][0], yj = polygon[j][1];
-    const intersect = ((yi > py) !== (yj > py)) &&
-      (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
-    if (intersect) inside = !inside;
-  }
-  return inside;
-};
+import { MAP_LIMIT } from './constants';
+import { useWorldData } from './hooks/useWorldData';
+import { useInventoryResources } from './hooks/useInventoryResources';
+import {
+  resolveHarvestPlant,
+  resolvePlantHit,
+  resolveRockHit,
+  resolveTreeHit
+} from './handlers/resourceHandlers';
+import type {
+  AttackMode,
+  Item,
+  PlantState,
+  Resources,
+  RockState,
+  ThrownKnifeData,
+  TreeState
+} from './types';
 
 const App: React.FC = () => {
   const [isLocked, setIsLocked] = useState(false);
@@ -108,19 +40,7 @@ const App: React.FC = () => {
   const [isConsuming, setIsConsuming] = useState(false);
   const [isLookingAtInteractable, setIsLookingAtInteractable] = useState(false);
 
-  const [resources, setResources] = useState<Resources>({
-    wood: 0,
-    fiber: 0,
-    sticks: 0,
-    stones: 0,
-    seeds: 0
-  });
-
-  const [inventory, setInventory] = useState<Item[]>([
-    { id: 'knife_01', name: 'Survival Knife', type: 'weapon', damage: 25 },
-    { id: 'axe_01', name: 'Iron Axe', type: 'weapon', damage: 45 },
-    { id: 'pickaxe_01', name: 'Steel Pickaxe', type: 'weapon', damage: 55 }
-  ]);
+  const { resources, inventory, setInventory, addResource, addItemToInventory } = useInventoryResources();
   
   const [treeStates, setTreeStates] = useState<Record<number, TreeState>>({});
   const [rockStates, setRockStates] = useState<Record<number, RockState>>({});
@@ -132,99 +52,7 @@ const App: React.FC = () => {
   const activeTreeIdsRef = useRef<Set<number>>(new Set());
   const activeRockIdsRef = useRef<Set<number>>(new Set());
 
-  const worldData = useMemo(() => {
-    const assets: ForestAsset[] = [];
-    const ponds: PondData[] = [];
-    const mountains: ForestAsset[] = [];
-    const initialTreeStates: Record<number, TreeState> = {};
-    const initialRockStates: Record<number, RockState> = {};
-    const initialPlantStates: Record<number, PlantState> = {};
-    
-    // Mountains...
-    const mountainCount = 64;
-    const mRadius = MAP_LIMIT + 5;
-    for (let i = 0; i < mountainCount; i++) {
-      const angle = (i / mountainCount) * Math.PI * 2;
-      const x = Math.cos(angle) * mRadius;
-      const z = Math.sin(angle) * mRadius;
-      mountains.push({
-        id: 10000 + i,
-        type: 'mountain',
-        position: [x, 0, z],
-        scale: 18 + Math.random() * 12,
-        rotation: Math.random() * Math.PI * 2,
-        radius: (18 + Math.random() * 12) * 0.7, 
-        height: 25 + Math.random() * 15
-      });
-    }
-
-    // Ponds...
-    const pondCount = 6;
-    for (let i = 0; i < pondCount; i++) {
-      const px = (Math.random() - 0.5) * 85;
-      const pz = (Math.random() - 0.5) * 85;
-      const vertices: [number, number][] = [];
-      const segmentCount = 12 + Math.floor(Math.random() * 8);
-      const baseRadius = 5 + Math.random() * 5;
-      for (let s = 0; s < segmentCount; s++) {
-        const angle = (s / segmentCount) * Math.PI * 2;
-        const radius = baseRadius * (0.6 + Math.random() * 0.8);
-        vertices.push([Math.cos(angle) * radius, Math.sin(angle) * radius]);
-      }
-      ponds.push({ id: i, position: [px, 0.06, pz], vertices });
-    }
-
-    const assetCount = 550;
-    const spread = 135;
-    for (let i = 0; i < assetCount; i++) {
-      const x = (Math.random() - 0.5) * spread;
-      const z = (Math.random() - 0.5) * spread;
-      if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
-      
-      let inWater = false;
-      for (const pond of ponds) {
-        const lx = x - pond.position[0];
-        const lz = z - pond.position[2];
-        if (isPointInPolygon(lx, lz, pond.vertices)) { inWater = true; break; }
-      }
-      if (inWater) continue;
-
-      const rand = Math.random();
-      const scale = 0.6 + Math.random() * 1.6;
-      const rotation = Math.random() * Math.PI * 2;
-      
-      if (rand < 0.45) {
-        const treeTypeRand = Math.random();
-        let subType: 'pine' | 'oak' | 'birch' = 'pine';
-        let radius = 0.4 * scale;
-        let height = 4 * scale;
-        let health = 120;
-        if (treeTypeRand < 0.4) subType = 'pine'; 
-        else if (treeTypeRand < 0.75) { subType = 'oak'; radius = 0.6 * scale; height = 3 * scale; health = 220; }
-        else { subType = 'birch'; radius = 0.3 * scale; height = 5 * scale; health = 100; }
-        
-        assets.push({ id: i, type: 'tree', subType, position: [x, 0, z], scale, rotation, radius, height });
-        initialTreeStates[i] = { health, maxHealth: health, isFalling: false, fallProgress: 0, fallDirection: [Math.random() - 0.5, Math.random() - 0.5], opacity: 1, isRemoved: false };
-      } else if (rand < 0.7) {
-        const hitsNeeded = 6 + Math.floor(Math.random() * 5); 
-        const health = hitsNeeded * 55;
-        assets.push({ id: i, type: 'rock', position: [x, 0, z], scale, rotation, radius: 1 * scale, height: 0.8 * scale });
-        initialRockStates[i] = { health, maxHealth: health, isRemoved: false, shakeTime: 0, cracks: 0 };
-      } else {
-        assets.push({ id: i, type: 'plant', position: [x, 0, z], scale, rotation, radius: 0.5 * scale, height: 0.2 * scale });
-        const hasFruit = Math.random() < 0.45;
-        const fruitTypes: FruitType[] = ['red', 'blue', 'yellow'];
-        initialPlantStates[i] = {
-          hasFruit,
-          fruitType: hasFruit ? fruitTypes[Math.floor(Math.random() * 3)] : undefined,
-          fruitCount: hasFruit ? 1 + Math.floor(Math.random() * 3) : 0,
-          health: 3,
-          isRemoved: false
-        };
-      }
-    }
-    return { assets, ponds, mountains, initialTreeStates, initialRockStates, initialPlantStates };
-  }, []);
+  const worldData = useWorldData(MAP_LIMIT);
 
   useEffect(() => {
     setTreeStates(worldData.initialTreeStates);
@@ -262,99 +90,51 @@ const App: React.FC = () => {
     [worldData.assets, treeStates, rockStates, plantStates]
   );
 
-  const addResource = useCallback((type: keyof Resources, amount: number) => {
-    setResources(prev => ({ ...prev, [type]: prev[type] + amount }));
-  }, []);
-
-  const addItemToInventory = useCallback((item: Item) => {
-    setInventory(prev => {
-      const existing = prev.find(i => i.id === item.id);
-      if (existing) {
-        return prev.map(i => i.id === item.id ? { ...i, count: (i.count || 1) + (item.count || 1) } : i);
-      }
-      if (prev.length < 16) return [...prev, { ...item, count: item.count || 1 }];
-      return prev;
-    });
-  }, []);
-
   const handleTreeHit = useCallback((treeId: number) => {
-    const isAxe = equippedWeapon?.id === 'axe_01';
-    const isKnife = equippedWeapon?.id === 'knife_01';
-    if (isAxe || isKnife) {
-      setTreeStates(prev => {
-        const current = prev[treeId];
-        if (!current || current.health <= 0 || current.isFalling) return prev;
-        const damage = (equippedWeapon?.damage || 20) * (isAxe ? 1 : 0.2);
-        const newHealth = current.health - damage;
-        if (isAxe) { addResource('wood', Math.random() > 0.4 ? 1 : 0); addResource('sticks', Math.random() > 0.7 ? 1 : 0); }
-        else if (isKnife) { addResource('fiber', Math.floor(Math.random() * 3) + 1); }
-        if (newHealth <= 0) { 
-          addResource('wood', 5); 
-          addResource('sticks', 3); 
-          activeTreeIdsRef.current.add(treeId);
-          return { ...prev, [treeId]: { ...current, health: 0, isFalling: true } }; 
-        }
-        return { ...prev, [treeId]: { ...current, health: newHealth } };
+    setTreeStates(prev => {
+      const current = prev[treeId];
+      const result = resolveTreeHit({ treeState: current, weapon: equippedWeapon });
+      if (!result) return prev;
+      Object.entries(result.resourceChanges).forEach(([type, amount]) => {
+        addResource(type as keyof Resources, amount as number);
       });
-    }
+      if (result.activateTree) activeTreeIdsRef.current.add(treeId);
+      return { ...prev, [treeId]: result.nextState };
+    });
   }, [equippedWeapon, addResource]);
 
   const handleRockHit = useCallback((rockId: number) => {
-    if (equippedWeapon?.id === 'pickaxe_01') {
-      setRockStates(prev => {
-        const current = prev[rockId];
-        if (!current || current.isRemoved) return prev;
-        const newHealth = current.health - (equippedWeapon?.damage || 20);
-        addResource('stones', Math.floor(Math.random() * 3) + 2);
-        if (newHealth <= 0) { 
-          addResource('stones', 10); 
-          activeRockIdsRef.current.add(rockId);
-          return { ...prev, [rockId]: { ...current, health: 0, isRemoved: true, shakeTime: 0.8, cracks: 1 } }; 
-        }
-        activeRockIdsRef.current.add(rockId);
-        return { ...prev, [rockId]: { ...current, health: newHealth, shakeTime: 0.3, cracks: Math.max(0, 1 - newHealth / current.maxHealth) } };
+    setRockStates(prev => {
+      const current = prev[rockId];
+      const result = resolveRockHit({ rockState: current, weapon: equippedWeapon });
+      if (!result) return prev;
+      Object.entries(result.resourceChanges).forEach(([type, amount]) => {
+        addResource(type as keyof Resources, amount as number);
       });
-    }
+      if (result.activateRock) activeRockIdsRef.current.add(rockId);
+      return { ...prev, [rockId]: result.nextState };
+    });
   }, [equippedWeapon, addResource]);
 
   const handlePlantHit = useCallback((plantId: number) => {
-    if (equippedWeapon?.id === 'knife_01') {
-      setPlantStates(prev => {
-        const current = prev[plantId];
-        if (!current || current.isRemoved) return prev;
-        
-        const newHealth = current.health - 1;
-        addResource('fiber', 5);
-
-        if (newHealth <= 0) {
-          const droppedSeeds = Math.floor(Math.random() * 3);
-          if (droppedSeeds > 0) addResource('seeds', droppedSeeds);
-          return { ...prev, [plantId]: { ...current, health: 0, isRemoved: true } };
-        }
-
-        return { ...prev, [plantId]: { ...current, health: newHealth } };
+    setPlantStates(prev => {
+      const current = prev[plantId];
+      const result = resolvePlantHit({ plantState: current, weapon: equippedWeapon });
+      if (!result) return prev;
+      Object.entries(result.resourceChanges).forEach(([type, amount]) => {
+        addResource(type as keyof Resources, amount as number);
       });
-    }
+      return { ...prev, [plantId]: result.nextState };
+    });
   }, [equippedWeapon, addResource]);
 
   const handleHarvestPlant = useCallback((plantId: number) => {
     setPlantStates(prev => {
       const current = prev[plantId];
-      if (!current || !current.hasFruit || current.isRemoved) return prev;
-      
-      const fruitId = `fruit_${current.fruitType}`;
-      const fruitName = `${current.fruitType?.charAt(0).toUpperCase()}${current.fruitType?.slice(1)} Berry`;
-      
-      addItemToInventory({
-        id: fruitId,
-        name: fruitName,
-        type: 'gadget',
-        isConsumable: true,
-        fruitType: current.fruitType,
-        count: current.fruitCount
-      });
-
-      return { ...prev, [plantId]: { ...current, hasFruit: false, fruitCount: 0 } };
+      const result = resolveHarvestPlant({ plantState: current });
+      if (!result) return prev;
+      addItemToInventory(result.item);
+      return { ...prev, [plantId]: result.nextState };
     });
   }, [addItemToInventory]);
 

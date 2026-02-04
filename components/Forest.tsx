@@ -5,7 +5,8 @@ import Tree from './Tree';
 import Rock from './Rock';
 import Plant from './Plant';
 import Pond from './Pond';
-import { ForestAsset, PondData, TreeState, RockState, PlantState, MAP_LIMIT } from '../App';
+import { MAP_LIMIT } from '../constants';
+import { ForestAsset, PondData, TreeState, RockState, PlantState } from '../types';
 
 interface ForestProps {
   assets: ForestAsset[];

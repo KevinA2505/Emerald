@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Item, AttackMode, Resources } from '../App';
+import { Item, AttackMode, Resources } from '../types';
 import ChargeBar from './ChargeBar';
 
 interface UIProps {
