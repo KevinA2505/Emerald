@@ -93,9 +93,6 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             color="#4b3621"
             type="pine-trunk"
             positionOffset={[0, 0.75, 0]}
-            enableViewCulling
-            maxDistance={MAP_LIMIT + 20}
-            fovPadding={15}
           />
           <InstancedAssets
             assets={pineTrees}
@@ -103,9 +100,6 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             color="#0b3d1c"
             type="pine-foliage"
             positionOffset={[0, 1.8, 0]}
-            enableViewCulling
-            maxDistance={MAP_LIMIT + 20}
-            fovPadding={15}
           />
         </>
       )}
@@ -118,9 +112,6 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             color="#3d2b1f"
             type="oak-trunk"
             positionOffset={[0, 1, 0]}
-            enableViewCulling
-            maxDistance={MAP_LIMIT + 20}
-            fovPadding={15}
           />
           <InstancedAssets
             assets={oakTrees}
@@ -128,9 +119,6 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             color="#1b4d3e"
             type="oak-foliage"
             positionOffset={[0, 2.8, 0]}
-            enableViewCulling
-            maxDistance={MAP_LIMIT + 20}
-            fovPadding={15}
           />
         </>
       )}
@@ -143,9 +131,6 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             color="#f0f0f0"
             type="birch-trunk"
             positionOffset={[0, 2.5, 0]}
-            enableViewCulling
-            maxDistance={MAP_LIMIT + 20}
-            fovPadding={15}
           />
           <InstancedAssets
             assets={birchTrees}
@@ -153,9 +138,6 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
             color="#a8e063"
             type="birch-foliage"
             positionOffset={[0, 5, 0]}
-            enableViewCulling
-            maxDistance={MAP_LIMIT + 20}
-            fovPadding={15}
           />
         </>
       )}
@@ -166,9 +148,6 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
           geometry={<dodecahedronGeometry args={[1, 0]} />}
           color="#6b6b6b"
           type="rock"
-          enableViewCulling
-          maxDistance={MAP_LIMIT + 20}
-          fovPadding={15}
         />
       )}
 
@@ -178,9 +157,6 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
           geometry={<sphereGeometry args={[0.6, 6, 5]} />}
           color="#2d5a27"
           type="plant"
-          enableViewCulling
-          maxDistance={MAP_LIMIT + 20}
-          fovPadding={15}
         />
       )}
 
@@ -209,9 +185,6 @@ const Forest: React.FC<ForestProps> = ({ assets, ponds, mountains, treeStates, r
           color="#141f10"
           type="mountain"
           isMountain
-          enableViewCulling
-          maxDistance={MAP_LIMIT + 40}
-          fovPadding={15}
         />
       )}
     </group>
