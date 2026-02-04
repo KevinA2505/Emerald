@@ -127,6 +127,10 @@ const App: React.FC = () => {
   const [plantStates, setPlantStates] = useState<Record<number, PlantState>>({});
   
   const controlsRef = useRef<any>(null);
+  const treeStatesRef = useRef<Record<number, TreeState>>({});
+  const rockStatesRef = useRef<Record<number, RockState>>({});
+  const activeTreeIdsRef = useRef<Set<number>>(new Set());
+  const activeRockIdsRef = useRef<Set<number>>(new Set());
 
   const worldData = useMemo(() => {
     const assets: ForestAsset[] = [];
@@ -228,6 +232,14 @@ const App: React.FC = () => {
     setPlantStates(worldData.initialPlantStates);
   }, [worldData.initialTreeStates, worldData.initialRockStates, worldData.initialPlantStates]);
 
+  useEffect(() => {
+    treeStatesRef.current = treeStates;
+  }, [treeStates]);
+
+  useEffect(() => {
+    rockStatesRef.current = rockStates;
+  }, [rockStates]);
+
   const addResource = useCallback((type: keyof Resources, amount: number) => {
     setResources(prev => ({ ...prev, [type]: prev[type] + amount }));
   }, []);
@@ -257,6 +269,7 @@ const App: React.FC = () => {
         if (newHealth <= 0) { 
           addResource('wood', 5); 
           addResource('sticks', 3); 
+          activeTreeIdsRef.current.add(treeId);
           return { ...prev, [treeId]: { ...current, health: 0, isFalling: true } }; 
         }
         return { ...prev, [treeId]: { ...current, health: newHealth } };
@@ -271,7 +284,12 @@ const App: React.FC = () => {
         if (!current || current.isRemoved) return prev;
         const newHealth = current.health - (equippedWeapon?.damage || 20);
         addResource('stones', Math.floor(Math.random() * 3) + 2);
-        if (newHealth <= 0) { addResource('stones', 10); return { ...prev, [rockId]: { ...current, health: 0, isRemoved: true, shakeTime: 0.8, cracks: 1 } }; }
+        if (newHealth <= 0) { 
+          addResource('stones', 10); 
+          activeRockIdsRef.current.add(rockId);
+          return { ...prev, [rockId]: { ...current, health: 0, isRemoved: true, shakeTime: 0.8, cracks: 1 } }; 
+        }
+        activeRockIdsRef.current.add(rockId);
         return { ...prev, [rockId]: { ...current, health: newHealth, shakeTime: 0.3, cracks: Math.max(0, 1 - newHealth / current.maxHealth) } };
       });
     }
@@ -346,40 +364,76 @@ const App: React.FC = () => {
   }, [isConsuming, equippedGadget]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTreeStates(prev => {
-        const next = { ...prev };
-        let changed = false;
-        Object.keys(next).forEach(idKey => {
-          const id = parseInt(idKey);
-          const state = next[id];
-          if (state.isFalling) {
-            changed = true;
-            if (state.fallProgress < 1) state.fallProgress = Math.min(1, state.fallProgress + 0.02);
-            else if (state.opacity > 0) state.opacity = Math.max(0, state.opacity - 0.01);
-            else {
-              if (!state.isRemoved) {
-                const droppedSeeds = Math.floor(Math.random() * 3);
-                if (droppedSeeds > 0) addResource('seeds', droppedSeeds);
-              }
-              state.isRemoved = true;
-            }
+    let frameId: number;
+    let lastTime = 0;
+    const tick = (time: number) => {
+      const delta = lastTime ? (time - lastTime) / 16 : 1;
+      lastTime = time;
+      const treeUpdates: Record<number, TreeState> = {};
+      const rockUpdates: Record<number, RockState> = {};
+      let treeChanged = false;
+      let rockChanged = false;
+
+      activeTreeIdsRef.current.forEach(id => {
+        const current = treeStatesRef.current[id];
+        if (!current || current.isRemoved) {
+          activeTreeIdsRef.current.delete(id);
+          return;
+        }
+        if (!current.isFalling) {
+          activeTreeIdsRef.current.delete(id);
+          return;
+        }
+        let updated = current;
+        if (current.fallProgress < 1) {
+          updated = { ...updated, fallProgress: Math.min(1, current.fallProgress + 0.02 * delta) };
+        } else if (current.opacity > 0) {
+          updated = { ...updated, opacity: Math.max(0, current.opacity - 0.01 * delta) };
+        } else {
+          if (!current.isRemoved) {
+            const droppedSeeds = Math.floor(Math.random() * 3);
+            if (droppedSeeds > 0) addResource('seeds', droppedSeeds);
           }
-        });
-        return changed ? next : prev;
+          updated = { ...updated, isRemoved: true };
+        }
+        if (updated.isRemoved) activeTreeIdsRef.current.delete(id);
+        treeUpdates[id] = updated;
+        treeChanged = true;
       });
-      setRockStates(prev => {
-        const next = { ...prev };
-        let changed = false;
-        Object.keys(next).forEach(idKey => {
-          const id = parseInt(idKey);
-          const state = next[id];
-          if (state.shakeTime > 0) { changed = true; state.shakeTime = Math.max(0, state.shakeTime - 0.02); }
-        });
-        return changed ? next : prev;
+
+      activeRockIdsRef.current.forEach(id => {
+        const current = rockStatesRef.current[id];
+        if (!current) {
+          activeRockIdsRef.current.delete(id);
+          return;
+        }
+        if (current.shakeTime <= 0) {
+          activeRockIdsRef.current.delete(id);
+          return;
+        }
+        const updated = { ...current, shakeTime: Math.max(0, current.shakeTime - 0.02 * delta) };
+        if (updated.shakeTime <= 0) activeRockIdsRef.current.delete(id);
+        rockUpdates[id] = updated;
+        rockChanged = true;
       });
-    }, 16);
-    return () => clearInterval(interval);
+
+      if (treeChanged) {
+        setTreeStates(prev => {
+          if (!treeChanged) return prev;
+          return { ...prev, ...treeUpdates };
+        });
+      }
+      if (rockChanged) {
+        setRockStates(prev => {
+          if (!rockChanged) return prev;
+          return { ...prev, ...rockUpdates };
+        });
+      }
+
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
   }, [addResource]);
 
   const handleStart = useCallback(() => {
