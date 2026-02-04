@@ -30,7 +30,11 @@ const InstancedAssets: React.FC<InstancedProps> = ({
   const tempObject = useMemo(() => new THREE.Object3D(), []);
   const { camera } = useThree();
   const [offsetX, offsetY, offsetZ] = positionOffset ?? [0, 0, 0];
-  const instanceTransformsRef = useRef<{ matrix: THREE.Matrix4; position: THREE.Vector3 }[]>([]);
+  const instanceTransformsRef = useRef<{
+    matrix: THREE.Matrix4;
+    position: THREE.Vector3;
+    cullPosition: THREE.Vector3;
+  }[]>([]);
   const cameraDirection = useMemo(() => new THREE.Vector3(), []);
   const toInstance = useMemo(() => new THREE.Vector3(), []);
   const cameraPosition = useMemo(() => new THREE.Vector3(), []);
@@ -72,6 +76,7 @@ const InstancedAssets: React.FC<InstancedProps> = ({
       meshRef.current?.setMatrixAt(i, tempObject.matrix);
 
       const instancePosition = new THREE.Vector3().setFromMatrixPosition(tempObject.matrix);
+      const cullPosition = new THREE.Vector3(x, y + asset.height * 0.25, z);
       const instanceMatrix = tempObject.matrix.clone();
 
       if (baseBoundingSphere && centersBox) {
@@ -86,7 +91,7 @@ const InstancedAssets: React.FC<InstancedProps> = ({
         centersBox.expandByPoint(instanceCenter);
       }
 
-      return { matrix: instanceMatrix, position: instancePosition };
+      return { matrix: instanceMatrix, position: instancePosition, cullPosition };
     });
 
     meshRef.current.instanceMatrix.needsUpdate = true;
@@ -141,10 +146,10 @@ const InstancedAssets: React.FC<InstancedProps> = ({
 
     let visibleIndex = 0;
     instanceTransformsRef.current.forEach((instance) => {
-      const distance = instance.position.distanceTo(cameraPosition);
+      const distance = instance.cullPosition.distanceTo(cameraPosition);
       if (distance > maxDistance) return;
 
-      toInstance.subVectors(instance.position, cameraPosition).normalize();
+      toInstance.subVectors(instance.cullPosition, cameraPosition).normalize();
       if (toInstance.dot(cameraDirection) < cosThreshold) return;
 
       meshRef.current?.setMatrixAt(visibleIndex, instance.matrix);
